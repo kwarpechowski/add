@@ -1,0 +1,96 @@
+---
+title: "Projekt"
+author: "Kamil Warpechowski, Marek Węgrzyn"
+output:
+  html_document: default
+---
+
+```{r, include=FALSE}
+library("ggplot2")
+library("lubridate")
+library ("forecast"")
+wig <- read.csv(file="wig20_d.csv", header=TRUE, sep=",")
+wig$Data <- as.Date(wig$Data, "%Y-%m-%d")
+```
+
+
+```{r, echo=FALSE}
+ggplot(wig, aes(wig$Data, wig$Otwarcie)) + geom_line() +  labs(x = "Rok", y = "Otwarcie (zł)")
+ggplot(wig, aes(wig$Data, wig$Wolumen)) + geom_line()  +  labs(x = "Rok", y = "Wolumen (zł)")
+
+```
+
+
+```{r, include=FALSE}
+firstYear <- ymd(min(wig$Data))
+firstYear <- year(firstYear)
+
+lastYear <- ymd(max(wig$Data))
+lastYear <- year(lastYear)
+
+generateData <- function(years) {
+  respMin <- c()
+  respMax <- c()
+  resMedian <- c()
+  resMean <- c()
+  resp1Q <- c()
+  resp3Q <- c()
+  
+  for (year in years) {
+    minV <- paste(year, '-01-01',  sep='')
+    maxV <- paste(year, '-12-31',  sep='')
+    data<- wig[wig$Data >= minV & wig$Data <= maxV,]
+    
+    sum <- summary(data$Zamkniecie);
+    
+    respMin <- c(respMin, sum[1])
+    resp1Q <- c(resp1Q, sum[2])
+    resMedian <- c(resMedian, sum[3])
+    resMean <- c(resMean, sum[4])
+    resp3Q <- c(resp3Q, sum[5])
+    respMax <- c(respMax, sum[6])
+    
+  }
+  return (list(respMin, resp1Q, resMedian, resMean, resp3Q, respMax))
+}
+
+
+years <- seq(from = firstYear, to = lastYear, by = 1)
+data <- data.frame(years, generateData(years))
+names(data) <- list('Rok', 'Minimum', '1 kwartyl', 'Mediana', 'Średnia', '3 kwartyl', 'Maksimum')
+```
+
+```{r, echo=FALSE}
+head(data)
+
+```
+
+## Zdiagnozowany problem
+Dane są niepełne. brakuje dni (weekendy, święta itd). Trzeba uzupełniać wartościami z dnia poprzedniego
+
+```{r}
+  days <- seq(min(wig$Data), max(wig$Data), by = "day")
+  values <- c()
+  
+  for (day in days) {
+    d <- which(wig$Data == day);
+
+    if (is.na(d[1])) {
+      values <-  c(values, last);
+    } else {
+      last <- wig$Zamkniecie[d[1]];
+      values <-  c(values, last);
+    }
+  }
+
+
+  wn <- ts(values, start=c(2012, 1, 1), end=c(2017, 12, 31), frequency=12)
+  decomp = decompose(wn);
+  plot(decomp)
+  
+  wigN <- data.frame(data = days, value = values)
+
+  ggplot(wigN, aes(wigN$data, wigN$value)) + geom_line() +  labs(x = "Rok", y = "Zamkniecie (zł)")
+          
+
+```
